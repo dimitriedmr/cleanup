@@ -2,7 +2,7 @@ from csv import writer
 from hashlib import md5
 from multiprocessing import Process, Queue, Manager, cpu_count
 from os import listdir
-from os.path import join, isdir, exists, abspath
+from os.path import join, isdir, exists, abspath, dirname
 
 file_chunks_used = 20
 file_chunk_size = 8192
@@ -44,8 +44,6 @@ def worker(queue, all_files_dict):
         compute(queue.get(), queue, all_files_dict)
 
 start_paths=[
-    r"D:\_Dimitrie", 
-    r"E:\_Dimitrie"
     # r"D:\test1", 
     # r"E:\test2"
     ]
@@ -69,7 +67,7 @@ if __name__ == "__main__":
         process.join()
 
     # save results dictionary to csv
-    out_path = join(abspath(__file__), r"output.csv")
+    out_path = join(dirname(abspath(__file__)), r"output.csv")
     sep = '.'
     i = 0
     while exists(out_path):
