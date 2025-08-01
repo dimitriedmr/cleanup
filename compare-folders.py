@@ -1,11 +1,14 @@
+from argparse import ArgumentParser
 from csv import writer
 from hashlib import md5
 from multiprocessing import Process, Queue, Manager, cpu_count
 from os import listdir
-from os.path import join, isdir, exists, abspath, dirname
+from os.path import join, isdir, exists, abspath, dirname, getsize
+from time import sleep
 
-file_chunks_used = 20
-file_chunk_size = 8192
+kbit = 1024
+file_chunk_size = 8 * kbit # bits
+file_ignore_over_size = 50 * kbit * kbit # Bytes
 
 def compute(path, queue, all_files_dict):
     """Worker function to compute has of files.
@@ -21,12 +24,13 @@ def compute(path, queue, all_files_dict):
                 # to compute file hash, use several chunks from it
                 hash = md5()
                 with open(file_path, 'rb') as f:
-                    i = 0
                     chunk = f.read(file_chunk_size)
-                    while i < file_chunks_used and chunk: # first chunks determines hash value
+                    while chunk: # first chunks determines hash value
                         hash.update(chunk)
-                        i += 1
                         chunk = f.read(file_chunk_size)
+                        
+                        if getsize(file_path) > file_ignore_over_size: # in Bytes
+                            chunk = None
                 hash = hash.hexdigest()
                 
                 # update dict, merge based on keys
@@ -40,32 +44,16 @@ def compute(path, queue, all_files_dict):
         pass
 
 def worker(queue, all_files_dict):
-    while not queue.empty():
-        compute(queue.get(), queue, all_files_dict)
+    done = False
+    while not done:
+        if queue.empty():
+            sleep(1) # 1s
+        if queue.empty():
+            done = True
+        else:
+            compute(queue.get(), queue, all_files_dict)
 
-start_paths=[
-    # r"D:\test1", 
-    # r"E:\test2"
-    ]
-    
-if __name__ == "__main__":
-    queue = Queue() # it contains directories to explore
-    for path in start_paths:
-        queue.put(path)
-
-    manager = Manager()
-    all_files_dict = manager.dict() # need a manager to share dictionary
-
-    # create workers
-    processes = []
-    for _ in range(cpu_count()):
-        process = Process(target=worker, args=(queue,all_files_dict))
-        processes.append(process)
-        process.start()
-    # wait for all processes to finish
-    for process in processes:
-        process.join()
-
+def save(files_path:list):
     # save results dictionary to csv
     out_path = join(dirname(abspath(__file__)), r"output.csv")
     sep = '.'
@@ -78,5 +66,31 @@ if __name__ == "__main__":
     with open(out_path, mode="w", newline="", encoding='utf8') as file:
         w = writer(file)
         w.writerow(["checksum", "paths"])
-        for key, value in all_files_dict.items():
+        for key, value in files_path.items():
             w.writerow([key, value])
+
+if __name__ == "__main__":
+    
+    parser = ArgumentParser(description="Check for duplicates for a given list of folders")
+    parser.add_argument("-c", action="extend", nargs="+", type=str)
+    args = parser.parse_args()
+
+    # shared queue with directories to explore
+    queue = Queue() 
+    for path in args.c:
+        queue.put(path)
+    # need a manager to share results dictionary
+    manager = Manager()
+    results = manager.dict() 
+    # create workers
+    processes = []
+    for _ in range(cpu_count()):
+        process = Process(target=worker, args=(queue, results))
+        processes.append(process)
+        process.start()
+    # wait for all processes to finish
+    for process in processes:
+        process.join()
+
+    save(results)
+
