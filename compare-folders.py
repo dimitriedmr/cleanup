@@ -4,6 +4,7 @@ from hashlib import md5
 from multiprocessing import Process, Queue, Manager, cpu_count
 from os import listdir
 from os.path import join, isdir, exists, abspath, dirname, getsize
+from sys import argv
 from time import sleep
 
 kbit = 1024
@@ -72,25 +73,27 @@ def save(files_path:list):
 if __name__ == "__main__":
     
     parser = ArgumentParser(description="Check for duplicates for a given list of folders")
-    parser.add_argument("-c", action="extend", nargs="+", type=str)
+    parser.add_argument("-d", action="extend", nargs="+", type=str)
     args = parser.parse_args()
 
-    # shared queue with directories to explore
-    queue = Queue() 
-    for path in args.c:
-        queue.put(path)
-    # need a manager to share results dictionary
-    manager = Manager()
-    results = manager.dict() 
-    # create workers
-    processes = []
-    for _ in range(cpu_count()):
-        process = Process(target=worker, args=(queue, results))
-        processes.append(process)
-        process.start()
-    # wait for all processes to finish
-    for process in processes:
-        process.join()
+    if len(argv) <= 1:
+        print("It needs a directory as argument. E.g. \"-d C:\\\"")
+    else:
+        # shared queue with directories to explore
+        queue = Queue() 
+        for path in args.d:
+            queue.put(path)
+        # need a manager to share results dictionary
+        manager = Manager()
+        results = manager.dict() 
+        # create workers
+        processes = []
+        for _ in range(cpu_count()):
+            process = Process(target=worker, args=(queue, results))
+            processes.append(process)
+            process.start()
+        # wait for all processes to finish
+        for process in processes:
+            process.join()
 
-    save(results)
-
+        save(results)
