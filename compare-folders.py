@@ -1,15 +1,15 @@
+#using multiprocessing, it computes hash of files from given directories, and it saves them to a csv file
 from argparse import ArgumentParser
 from csv import writer
 from hashlib import md5
 from multiprocessing import Process, Queue, Manager, cpu_count
 from os import listdir
-from os.path import join, isdir, exists, abspath, dirname, getsize
+from os.path import join, isdir, exists, abspath, dirname
 from sys import argv
 from time import sleep
 
 kbit = 1024
-file_chunk_size = 8 * kbit # bits
-file_ignore_over_size = 50 * kbit * kbit # Bytes
+file_chunk_size = 8 * kbit # kByte
 
 def compute(path, queue, all_files_dict):
     """Worker function to compute files hash.
@@ -25,13 +25,14 @@ def compute(path, queue, all_files_dict):
                 # to compute file hash, use several chunks from it
                 hash = md5()
                 with open(file_path, 'rb') as f:
+                    chunk_flag = 1 # skip some chunks to increase speed
                     chunk = f.read(file_chunk_size)
                     while chunk: # first chunks determines hash value
-                        hash.update(chunk)
+                        if chunk_flag:
+                            hash.update(chunk)
                         chunk = f.read(file_chunk_size)
-                        
-                        if getsize(file_path) > file_ignore_over_size: # in Bytes
-                            chunk = None
+                        chunk_flag = not chunk_flag
+
                 hash = hash.hexdigest()
                 
                 # update dict, merge based on keys
