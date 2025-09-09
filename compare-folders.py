@@ -12,7 +12,7 @@ file_chunk_size = 8 * kbit # bits
 file_ignore_over_size = 50 * kbit * kbit # Bytes
 
 def compute(path, queue, all_files_dict):
-    """Worker function to compute has of files.
+    """Worker function to compute files hash.
     input: path
     output: queue, all_files_dict
     """
